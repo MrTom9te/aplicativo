@@ -30,7 +30,7 @@ const mockOrders: Order[] = [
     totalPrice: 45.0,
     deliveryDate: "2025-10-16",
     deliveryTime: "14:00",
-    status: "pending",
+    status: "pendente",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -85,30 +85,12 @@ const mockOrders: Order[] = [
 ];
 
 const statusFilters: OrderStatus[] = [
-  "pending",
+  "pendente",
   "confirmed",
   "production",
   "ready",
 ];
 
-/**
- * @file app/(tabs)/orders.tsx
- * @brief Tela de Pedidos da confeiteira.
- *
- * Este componente exibe uma lista de todos os pedidos recebidos pela confeiteira,
- * permitindo a filtragem por status (pendente, confirmado, em produção, pronto).
- * Cada pedido na lista é um item clicável que leva para a tela de detalhes do pedido.
- * Utiliza dados mocados para simular os pedidos.
- *
- * @component OrdersScreen
- *
- * @returns {JSX.Element} Uma tela que mostra uma lista filtrável de pedidos.
- *
- * @example
- * // Este componente é uma tela e deve ser usado como uma rota dentro do `expo-router`
- * // e renderizado como uma aba, conforme configurado em `app/(tabs)/_layout.tsx`.
- * // <Tabs.Screen name="orders" options={{ title: "Pedidos" }} />
- */
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [filter, setFilter] = useState<OrderStatus | "Todos">("Todos");
@@ -118,19 +100,8 @@ export default function OrdersScreen() {
     return o.status === filter;
   });
 
-  /**
-   * @brief Renderiza um único item de pedido para a `FlatList`.
-   *
-   * Esta função é passada para a propriedade `renderItem` da `FlatList`.
-   * Ela recebe um objeto contendo o item do pedido e retorna um componente JSX
-   * que exibe as informações do pedido e é clicável, levando para a tela
-   * de detalhes do pedido.
-   *
-   * @param {{ item: Order }} props - As propriedades passadas pela `FlatList`, contendo o item do pedido.
-   * @returns {JSX.Element} Um componente `TouchableOpacity` que representa um cartão de pedido.
-   */
   const renderOrder = ({ item }: { item: Order }) => (
-    <Link href={{ pathname: "./orders/[id]", params: { id: item.id } }} asChild>
+    <Link href={{ pathname: "/orders/[id]", params: { id: item.id } }} asChild>
       <TouchableOpacity style={styles.orderCard}>
         <View
           style={[
@@ -227,14 +198,9 @@ export default function OrdersScreen() {
   );
 }
 
-/**
- * @brief Retorna uma cor hexadecimal baseada no status do pedido.
- * @param {OrderStatus} status - O status do pedido (e.g., "pending", "confirmed", "production").
- * @returns {string} Uma string de cor hexadecimal.
- */
 const getStatusColor = (status: OrderStatus) => {
   const colors: Record<OrderStatus, string> = {
-    pending: "#F59E0B",
+    pendente: "#F59E0B",
     confirmed: "#3B82F6",
     production: "#8B5CF6",
     ready: "#10B981",
