@@ -177,7 +177,7 @@ export default function ProductsScreen() {
       />
 
       {/* Botão Flutuante para adicionar novo produto */}
-      <Link href="./products/new" asChild>
+      <Link href="/products/new" asChild>
         <TouchableOpacity style={styles.fab}>
           <MaterialCommunityIcons name="plus" size={28} color="white" />
         </TouchableOpacity>
