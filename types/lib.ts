@@ -129,7 +129,7 @@ export interface ListProductsParams extends ListParams {
 // ==================== PEDIDOS ====================
 
 export type OrderStatus =
-  | "pending"
+  | "pendente"
   | "confirmed"
   | "production"
   | "ready"
@@ -199,7 +199,7 @@ export enum OrderStatusEnum {
 }
 
 export const OrderStatusLabel: Record<OrderStatus, string> = {
-  pending: "Aguardando confirmação",
+  pendente: "Aguardando confirmação",
   confirmed: "Confirmado",
   production: "Em produção",
   ready: "Pronto",
