@@ -133,7 +133,7 @@ Authorization: Bearer {token}
       "name": "Bolo de Chocolate",
       "description": "Delicioso bolo de chocolate com cobertura cremosa",
       "price": 45.00,
-      "imageUrl": "https://cloudinary.com/image.jpg",
+      "imageUrl": "http://localhost:3000/images/produto-1.jpg",
       "isActive": true,
       "createdAt": "2025-10-10T10:00:00Z",
       "updatedAt": "2025-10-11T15:30:00Z"
@@ -143,7 +143,7 @@ Authorization: Bearer {token}
       "name": "Bolo de Morango",
       "description": "Bolo com morangos frescos",
       "price": 50.00,
-      "imageUrl": "https://cloudinary.com/image2.jpg",
+      "imageUrl": "http://localhost:3000/images/produto-2.jpg",
       "isActive": true,
       "createdAt": "2025-10-10T11:00:00Z",
       "updatedAt": "2025-10-10T11:00:00Z"
@@ -184,7 +184,7 @@ Authorization: Bearer {token}
       "name": "Bolo de Chocolate",
       "description": "Delicioso bolo de chocolate com cobertura cremosa",
       "price": 45.00,
-      "imageUrl": "https://cloudinary.com/image.jpg",
+      "imageUrl": "http://localhost:3000/images/produto-1.jpg",
       "createdAt": "2025-10-10T10:00:00Z"
     }
   ],
@@ -217,7 +217,7 @@ Authorization: Bearer {token}
     "name": "Bolo de Chocolate",
     "description": "Delicioso bolo de chocolate com cobertura cremosa",
     "price": 45.00,
-    "imageUrl": "https://cloudinary.com/image.jpg",
+    "imageUrl": "http://localhost:3000/images/produto-1.jpg",
     "isActive": true,
     "createdAt": "2025-10-10T10:00:00Z",
     "updatedAt": "2025-10-11T15:30:00Z"
@@ -239,7 +239,7 @@ Authorization: Bearer {token}
 ### 2.4 - Criar Produto
 **Endpoint:** `POST /products`
 
-**Descrição:** Cria um novo produto no catálogo da confeiteira. Pode incluir imagem via URL.
+**Descrição:** Cria um novo produto no catálogo da confeiteira. A imagem deve ser enviada como uma string em formato Base64.
 
 **Headers Requeridos:**
 ```
@@ -253,7 +253,7 @@ Content-Type: application/json
   "name": "Bolo de Chocolate",
   "description": "Delicioso bolo de chocolate com cobertura cremosa",
   "price": 45.00,
-  "imageUrl": "https://cloudinary.com/image.jpg"
+  "imageBase64": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQE..."
 }
 ```
 
@@ -267,7 +267,7 @@ Content-Type: application/json
     "name": "Bolo de Chocolate",
     "description": "Delicioso bolo de chocolate com cobertura cremosa",
     "price": 45.00,
-    "imageUrl": "https://cloudinary.com/image.jpg",
+    "imageUrl": "http://localhost:3000/images/produto-novo-1.jpg",
     "isActive": true,
     "createdAt": "2025-10-11T15:30:00Z",
     "updatedAt": "2025-10-11T15:30:00Z"
@@ -288,14 +288,14 @@ Content-Type: application/json
 - Nome: obrigatório, 2-100 caracteres
 - Description: obrigatório, máximo 500 caracteres
 - Price: obrigatório, número positivo com máximo 2 casas decimais
-- ImageUrl: opcional, deve ser URL válida
+- imageBase64: opcional, deve ser uma string Base64 válida
 
 ---
 
 ### 2.5 - Atualizar Produto
 **Endpoint:** `PUT /products/:id`
 
-**Descrição:** Atualiza informações de um produto existente. Todos os campos são opcionais.
+**Descrição:** Atualiza informações de um produto existente. Para alterar a imagem, envie uma nova string `imageBase64`.
 
 **Headers Requeridos:**
 ```
@@ -312,7 +312,7 @@ Content-Type: application/json
   "name": "Bolo de Chocolate Premium",
   "description": "Novo bolo de chocolate com ingredientes premium",
   "price": 55.00,
-  "imageUrl": "https://cloudinary.com/image-new.jpg"
+  "imageBase64": "data:image/jpeg;base64,/9j/4AAQSk..."
 }
 ```
 
@@ -326,7 +326,7 @@ Content-Type: application/json
     "name": "Bolo de Chocolate Premium",
     "description": "Novo bolo de chocolate com ingredientes premium",
     "price": 55.00,
-    "imageUrl": "https://cloudinary.com/image-new.jpg",
+    "imageUrl": "http://localhost:3000/images/produto-atualizado-1.jpg",
     "isActive": true,
     "createdAt": "2025-10-10T10:00:00Z",
     "updatedAt": "2025-10-11T16:00:00Z"
@@ -348,7 +348,7 @@ Content-Type: application/json
 ### 2.6 - Deletar Produto
 **Endpoint:** `DELETE /products/:id`
 
-**Descrição:** Remove permanentemente um produto do catálogo.
+**Descrição:** Remove permanentemente um produto do catálogo. O backend também deve remover o arquivo de imagem associado.
 
 **Headers Requeridos:**
 ```
@@ -408,7 +408,7 @@ Content-Type: application/json
     "name": "Bolo de Chocolate",
     "description": "Delicioso bolo de chocolate com cobertura cremosa",
     "price": 45.00,
-    "imageUrl": "https://cloudinary.com/image.jpg",
+    "imageUrl": "http://localhost:3000/images/produto-1.jpg",
     "isActive": false,
     "updatedAt": "2025-10-11T16:15:00Z"
   }
@@ -711,4 +711,4 @@ Authorization: Bearer {token}
 
 5. **Quantidade Padrão:** Se não informada na criação de pedido, assume quantidade = 1.
 
-6. **Imagens:** URLs de imagem devem ser acessíveis publicamente. Não há upload de arquivo nesta API versão.
+6. **Upload de Imagens:** O aplicativo envia a imagem como uma string Base64 (`imageBase64`). O backend é responsável por decodificar essa string, salvar a imagem em seu sistema de arquivos e gerar uma URL pública (`imageUrl`) para servi-la. O app e o site então consomem essa `imageUrl`.
