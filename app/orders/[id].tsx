@@ -27,7 +27,7 @@ const mockOrder: Order = {
   totalPrice: 45.0,
   deliveryDate: "2025-10-16",
   deliveryTime: "14:00",
-  status: "pending",
+  status: "pendente",
   observations: "Sem corante artificial, por favor.",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -141,7 +141,7 @@ export default function OrderDetailScreen() {
 
 const getStatusColor = (status: OrderStatus) => {
   const colors: Record<OrderStatus, string> = {
-    pending: "#F59E0B",
+    pendente: "#F59E0B",
     confirmed: "#3B82F6",
     production: "#8B5CF6",
     ready: "#10B981",
