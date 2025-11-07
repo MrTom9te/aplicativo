@@ -1,4 +1,3 @@
-// app/(auth)/login.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -8,57 +7,47 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "expo-router";
-import Colors from "@/constants/Colors";
 
 const PINK = "#FF69B4";
 const LIGHT_GRAY = "#FAFAFA";
 const DARK_GRAY = "#333333";
+const RED_ERROR = "#D32F2F";
 
-/**
- * @file app/(auth)/login.tsx
- * @brief Tela de Login para autenticação de utilizadores.
- *
- * Este componente permite que os utilizadores insiram seu email e senha para fazer login na aplicação.
- * Ele gerencia o estado dos campos de entrada, o estado de carregamento durante a tentativa de login,
- * e exibe alertas em caso de erros de validação ou de autenticação.
- * Integra-se com o `AuthContext` para realizar a operação de `signIn`.
- * Também fornece um link para a tela de registro de novos utilizadores.
- *
- * @component LoginScreen
- *
- * @returns {JSX.Element} Uma tela de login com campos para email e senha,
- * botões de login e de navegação para registro.
- *
- * @example
- * // Este componente é uma tela e deve ser usado como uma rota dentro do `expo-router`.
- * // Ex: No arquivo `app/(auth)/_layout.tsx`, ele é referenciado como:
- * // <Stack.Screen name="login" options={{ title: "Login" }} />
- */
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { signIn } = useAuth();
+  // 1. O estado de erro para exibir a mensagem da API
+  const [error, setError] = useState<string | null>(null);
+
+  // 2. Pegamos o 'signIn' e também o 'isLoading' do nosso contexto
+  const { signIn, isLoading } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Erro", "Preencha email e senha");
+      setError("Por favor, preencha o email e a senha.");
       return;
     }
 
     try {
-      setIsLoading(true);
+      setError(null); // Limpa erros anteriores
       await signIn({ email, password });
-    } catch (error) {
-      Alert.alert("Erro de Login", "Email ou senha incorretos");
-    } finally {
-      setIsLoading(false);
+      // A navegação será tratada pelo AuthContext/Router, não precisamos fazer nada aqui
+    } catch (e: any) {
+      // 3. Captura o erro da API e o define no estado
+      setError(e.message || "Ocorreu um erro desconhecido.");
+    }
+    // O 'isLoading' já é gerenciado pelo AuthContext, não precisamos do finally
+  };
+
+  // Função para limpar o erro ao focar em um input
+  const clearErrorOnFocus = () => {
+    if (error) {
+      setError(null);
     }
   };
 
@@ -71,15 +60,12 @@ export default function LoginScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo/Título */}
         <View style={styles.headerSection}>
           <Text style={styles.title}>ConfeitApp</Text>
           <Text style={styles.subtitle}>Gerencie sua confeitaria</Text>
         </View>
 
-        {/* Formulário */}
         <View style={styles.formSection}>
-          {/* Campo Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -91,10 +77,10 @@ export default function LoginScreen() {
               editable={!isLoading}
               value={email}
               onChangeText={setEmail}
+              onFocus={clearErrorOnFocus} // Limpa o erro ao digitar
             />
           </View>
 
-          {/* Campo Senha */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Senha</Text>
             <TextInput
@@ -105,10 +91,13 @@ export default function LoginScreen() {
               editable={!isLoading}
               value={password}
               onChangeText={setPassword}
+              onFocus={clearErrorOnFocus} // Limpa o erro ao digitar
             />
           </View>
 
-          {/* Botão Login */}
+          {/* 4. Componente para exibir a mensagem de erro */}
+          {error && <Text style={styles.errorText}>{error}</Text>}
+
           <TouchableOpacity
             style={[
               styles.button,
@@ -125,14 +114,12 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Divider */}
           <View style={styles.divider}>
             <View style={styles.line} />
             <Text style={styles.dividerText}>Não tem conta?</Text>
             <View style={styles.line} />
           </View>
 
-          {/* Botão Register */}
           <TouchableOpacity
             style={[styles.button, styles.secondaryButton]}
             disabled={isLoading}
@@ -143,7 +130,6 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Footer */}
         <View style={styles.footerSection}>
           <Text style={styles.footerText}>
             Comece a vender seus bolos agora mesmo
@@ -202,6 +188,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: "white",
     color: DARK_GRAY,
+  },
+  // Estilo para o texto de erro
+  errorText: {
+    color: RED_ERROR,
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 10,
   },
   button: {
     paddingVertical: 14,
