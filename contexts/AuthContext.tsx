@@ -1,19 +1,27 @@
-import React, { createContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
+import type React from "react";
 import {
-  User,
+  createContext,
+  type ReactNode,
+  useCallback, // 1. Importar o useCallback
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+
+import api from "@/lib/api";
+import type { ErrorResponse, SucessResponse } from "@/types/api.types";
+import type {
+  AuthData,
   LoginRequest,
   RegisterRequest,
-  AuthResponse,
-  ApiErrorResponse,
-} from "@/types/lib";
+  User,
+} from "@/types/auth.types";
 
-const API_BASE = "http://localhost:3000/api";
-
-// ==================== CONTEXT ====================
+// ==================== CONTEXTO ====================
 
 interface AuthContextType {
-  token: string | null;
   user: User | null;
   isLoading: boolean;
   signIn: (credentials: LoginRequest) => Promise<void>;
@@ -25,116 +33,115 @@ export const AuthContext = createContext<AuthContextType | undefined>(
   undefined,
 );
 
-// ==================== PROVIDER ====================
+// ==================== PROVEDOR ====================
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restaura token ao iniciar
+  // 2. Envolver a função signOut com useCallback
+  // Como ela não depende de nada que muda, o array de dependências é vazio.
+  const signOut = useCallback(async (): Promise<void> => {
+    try {
+      await SecureStore.deleteItemAsync("token");
+      await AsyncStorage.removeItem("user");
+      setUser(null);
+    } catch (error) {
+      console.error("Erro no logout:", error);
+      // Não propagamos o erro aqui para não quebrar o app em um simples logout
+    }
+  }, []);
+
+  // Restaura a sessão ao iniciar o app
   useEffect(() => {
     const bootstrapAsync = async (): Promise<void> => {
       try {
-        const storedToken = await AsyncStorage.getItem("userToken");
-        const storedUser = await AsyncStorage.getItem("userData");
+        const token = await SecureStore.getItemAsync("token");
+        const storedUser = await AsyncStorage.getItem("user");
 
-        if (storedToken && storedUser) {
-          setToken(storedToken);
+        if (token && storedUser) {
           setUser(JSON.parse(storedUser));
+        } else {
+          // Se não houver token/usuário, garante que o estado esteja limpo
+          await signOut();
         }
       } catch (e) {
-        console.error("Failed to restore token", e);
+        console.error("Falha ao restaurar a sessão do usuário", e);
+        await signOut();
       } finally {
         setIsLoading(false);
       }
     };
 
     bootstrapAsync();
-  }, []);
+  }, [signOut]); // 3. Adicionar signOut como dependência do useEffect
 
-  // Login
-  const signIn = async (credentials: LoginRequest): Promise<void> => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
+  // 4. Envolver a função signIn com useCallback
+  const signIn = useCallback(
+    async (credentials: LoginRequest): Promise<void> => {
+      try {
+        setIsLoading(true);
+        const response = await api.post<SucessResponse<AuthData>>(
+          "/auth/login",
+          credentials,
+        );
 
-      const data: AuthResponse | ApiErrorResponse = await response.json();
+        const { data } = response;
 
-      if (!response.ok || !data.success) {
-        throw new Error("Login failed");
+        if (data.success && data.data) {
+          const { token: newToken, user: newUser } = data.data;
+
+          await SecureStore.setItemAsync("token", newToken);
+          await AsyncStorage.setItem("user", JSON.stringify(newUser));
+
+          setUser(newUser);
+        } else {
+          throw new Error((data as any).error || "Email ou senha incorretos.");
+        }
+      } catch (error) {
+        console.error("Erro no login:", error);
+        await signOut();
+        throw error;
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [signOut], // signIn depende de signOut
+  );
 
-      if ("data" in data && "token" in data.data && "user" in data.data) {
-        const { token: newToken, user: newUser } = data.data;
+  // 5. Envolver a função signUp com useCallback
+  const signUp = useCallback(
+    async (credentials: RegisterRequest): Promise<void> => {
+      try {
+        setIsLoading(true);
+        const response = await api.post("/auth/register", credentials);
 
-        await AsyncStorage.setItem("userToken", newToken);
-        await AsyncStorage.setItem("userData", JSON.stringify(newUser));
-
-        setToken(newToken);
-        setUser(newUser);
+        if (response.data.success) {
+          await signIn({
+            email: credentials.email,
+            password: credentials.password,
+          });
+        } else {
+          throw new Error(
+            (response.data as ErrorResponse).error ||
+              "Não foi possível registrar.",
+          );
+        }
+      } catch (error) {
+        console.error("Erro no registro:", error);
+        throw error;
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Sign in error:", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Logout
-  const signOut = async (): Promise<void> => {
-    try {
-      await AsyncStorage.removeItem("userToken");
-      await AsyncStorage.removeItem("userData");
-
-      setToken(null);
-      setUser(null);
-    } catch (error) {
-      console.error("Sign out error:", error);
-      throw error;
-    }
-  };
-
-  // Registro
-  const signUp = async (credentials: RegisterRequest): Promise<void> => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error("Registration failed");
-      }
-
-      // Após registro, faz login automaticamente
-      await signIn({
-        email: credentials.email,
-        password: credentials.password,
-      });
-    } catch (error) {
-      console.error("Sign up error:", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [signIn], // signUp depende de signIn
+  );
 
   const value: AuthContextType = {
-    token,
     user,
     isLoading,
     signIn,
@@ -148,10 +155,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 // ==================== HOOK CUSTOMIZADO ====================
 
 export const useAuth = (): AuthContextType => {
-  const context = React.useContext(AuthContext);
+  const context = useContext(AuthContext);
 
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
   }
 
   return context;
