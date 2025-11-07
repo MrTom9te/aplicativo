@@ -1,90 +1,70 @@
-// app/(auth)/register.tsx
+import { Link } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link, useRouter } from "expo-router";
 
 const PINK = "#FF69B4";
 const LIGHT_GRAY = "#FAFAFA";
 const DARK_GRAY = "#333333";
+const RED_ERROR = "#D32F2F";
 
-/**
- * @file app/(auth)/register.tsx
- * @brief Tela de Registro de Utilizadores.
- *
- * Este componente permite que novas confeiteiras criem uma conta na aplicação.
- * Ele coleta informações como nome, email, telefone, senha e confirmação de senha.
- * Realiza validações básicas nos campos de entrada e gerencia o estado de carregamento
- * durante a tentativa de registro. Integra-se com o `AuthContext` para a operação de `signUp`.
- * Em caso de sucesso, navega o utilizador para a tela de login.
- *
- * @component RegisterScreen
- *
- * @returns {JSX.Element} Uma tela de registro com campos para as informações do utilizador,
- * botões de registro e de navegação para login.
- *
- * @example
- * // Este componente é uma tela e deve ser usado como uma rota dentro do `expo-router`.
- * // Ex: No arquivo `app/(auth)/_layout.tsx`, ele é referenciado como:
- * // <Stack.Screen name="register" options={{ title: "Registrar" }} />
- */
 export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { signUp } = useAuth();
-  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
 
-  const validateForm = () => {
+  // Usando o signUp e isLoading do contexto
+  const { signUp, isLoading } = useAuth();
+
+  // Validação agora retorna uma mensagem de erro ou null
+  const validateForm = (): string | null => {
     if (!name || !email || !phone || !password || !confirmPassword) {
-      Alert.alert("Erro", "Preencha todos os campos");
-      return false;
+      return "Por favor, preencha todos os campos.";
     }
-
     if (password.length < 8) {
-      Alert.alert("Erro", "Senha deve ter no mínimo 8 caracteres");
-      return false;
+      return "A senha deve ter no mínimo 8 caracteres.";
     }
-
     if (password !== confirmPassword) {
-      Alert.alert("Erro", "As senhas não correspondem");
-      return false;
+      return "As senhas não correspondem.";
     }
-
     if (phone.replace(/\D/g, "").length < 10) {
-      Alert.alert("Erro", "Telefone inválido");
-      return false;
+      return "O formato do telefone é inválido.";
     }
-
-    return true;
+    return null; // Formulário válido
   };
 
   const handleRegister = async () => {
-    if (!validateForm()) return;
+    setError(null); // Limpa erros antigos
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     try {
-      setIsLoading(true);
       await signUp({ name, email, password, phone });
-      Alert.alert("Sucesso", "Conta criada com sucesso!");
-      router.replace("/(auth)/login");
-    } catch (error) {
-      Alert.alert("Erro ao Registrar", "Tente novamente com outro email");
-    } finally {
-      setIsLoading(false);
+      // Sucesso! O AuthContext e o Router cuidarão do resto.
+    } catch (e: any) {
+      setError(e.message || "Não foi possível criar a conta.");
+    }
+  };
+
+  const clearErrorOnFocus = () => {
+    if (error) {
+      setError(null);
     }
   };
 
@@ -97,94 +77,84 @@ export default function RegisterScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Voltar */}
         <Link href="/(auth)/login" asChild>
-          <TouchableOpacity style={styles.backButton}>
-            <Text style={styles.backText}>← Voltar</Text>
+          <TouchableOpacity style={styles.backButton} disabled={isLoading}>
+            <Text style={styles.backText}>← Voltar para Login</Text>
           </TouchableOpacity>
         </Link>
 
-        {/* Título */}
         <View style={styles.headerSection}>
           <Text style={styles.title}>Criar Conta</Text>
           <Text style={styles.subtitle}>Comece a vender seus bolos</Text>
         </View>
 
-        {/* Formulário */}
         <View style={styles.formSection}>
-          {/* Campo Nome */}
+          {/* Campos do formulário... */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Nome Completo</Text>
             <TextInput
               style={styles.input}
               placeholder="Maria Silva"
-              placeholderTextColor="#999"
-              autoCapitalize="words"
               editable={!isLoading}
               value={name}
               onChangeText={setName}
+              onFocus={clearErrorOnFocus}
             />
           </View>
-
-          {/* Campo Email */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <TextInput
               style={styles.input}
               placeholder="seu.email@confeitaria.com"
-              placeholderTextColor="#999"
               keyboardType="email-address"
               autoCapitalize="none"
               editable={!isLoading}
               value={email}
               onChangeText={setEmail}
+              onFocus={clearErrorOnFocus}
             />
           </View>
-
-          {/* Campo Telefone */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Telefone</Text>
             <TextInput
               style={styles.input}
               placeholder="(55) 92999887766"
-              placeholderTextColor="#999"
               keyboardType="phone-pad"
               editable={!isLoading}
               value={phone}
               onChangeText={setPhone}
+              onFocus={clearErrorOnFocus}
             />
           </View>
-
-          {/* Campo Senha */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Senha</Text>
             <TextInput
               style={styles.input}
               placeholder="••••••••"
-              placeholderTextColor="#999"
               secureTextEntry
               editable={!isLoading}
               value={password}
               onChangeText={setPassword}
+              onFocus={clearErrorOnFocus}
             />
             <Text style={styles.hint}>Mínimo 8 caracteres</Text>
           </View>
-
-          {/* Campo Confirmar Senha */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Confirmar Senha</Text>
             <TextInput
               style={styles.input}
               placeholder="••••••••"
-              placeholderTextColor="#999"
               secureTextEntry
               editable={!isLoading}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
+              onFocus={clearErrorOnFocus}
             />
           </View>
 
-          {/* Botão Registrar */}
+          {/* Exibição de Erro */}
+          {error && <Text style={styles.errorText}>{error}</Text>}
+
           <TouchableOpacity
             style={[
               styles.button,
@@ -201,7 +171,6 @@ export default function RegisterScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Login Link */}
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>Já tem conta? </Text>
             <Link href="/(auth)/login" asChild>
@@ -212,12 +181,7 @@ export default function RegisterScreen() {
           </View>
         </View>
 
-        {/* Footer */}
-        <View style={styles.footerSection}>
-          <Text style={styles.footerText}>
-            Seus dados estão protegidos e seguros
-          </Text>
-        </View>
+        <View style={styles.footerSection} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -284,6 +248,12 @@ const styles = StyleSheet.create({
     color: "#999",
     marginTop: 6,
   },
+  errorText: {
+    color: RED_ERROR,
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 10,
+  },
   button: {
     paddingVertical: 14,
     borderRadius: 12,
@@ -317,12 +287,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   footerSection: {
-    alignItems: "center",
-    marginTop: 30,
-  },
-  footerText: {
-    fontSize: 12,
-    color: "#999",
-    fontStyle: "italic",
+    height: 30,
   },
 });
