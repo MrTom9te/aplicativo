@@ -1,104 +1,39 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   ScrollView,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { Order, OrderStatus } from "@/types/orders.types";
+import { useOrders } from "@/hooks/useOrders"; // 1. Importar o hook
 
 const PINK = "#FF69B4";
 const LIGHT_GRAY = "#F7F7F7";
 const DARK_GRAY = "#333333";
 
-// Dados mocados
-const mockOrders: Order[] = [
-  {
-    id: "1",
-    orderNumber: "PED-001",
-    customerName: "Carlos Pereira",
-    customerPhone: "5592999887766",
-    productId: "1",
-    productName: "Bolo de Chocolate",
-    quantity: 1,
-    unitPrice: 45.0,
-    totalPrice: 45.0,
-    deliveryDate: "2025-10-16",
-    deliveryTime: "14:00",
-    status: "pendente",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    orderNumber: "PED-002",
-    customerName: "Juliana Costa",
-    customerPhone: "5592999887766",
-    productId: "2",
-    productName: "Torta de Limão",
-    quantity: 2,
-    unitPrice: 25.0,
-    totalPrice: 50.0,
-    deliveryDate: "2025-10-16",
-    deliveryTime: "16:30",
-    status: "production",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    orderNumber: "PED-003",
-    customerName: "Marcos Lima",
-    customerPhone: "5592999887766",
-    productId: "3",
-    productName: "Caixa de Brigadeiros",
-    quantity: 1,
-    unitPrice: 30.0,
-    totalPrice: 30.0,
-    deliveryDate: "2025-10-17",
-    deliveryTime: "11:00",
-    status: "ready",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "4",
-    orderNumber: "PED-004",
-    customerName: "Fernanda Alves",
-    customerPhone: "5592999887766",
-    productId: "4",
-    productName: "Bolo de Cenoura",
-    quantity: 1,
-    unitPrice: 40.0,
-    totalPrice: 40.0,
-    deliveryDate: "2025-10-18",
-    deliveryTime: "10:00",
-    status: "delivered",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
 const statusFilters: OrderStatus[] = [
-  "pendente",
+  "pending",
   "confirmed",
   "production",
   "ready",
 ];
 
 export default function OrdersScreen() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  // 2. Usar o hook para obter os dados
+  const { orders, isLoading, error, refetch } = useOrders();
   const [filter, setFilter] = useState<OrderStatus | "Todos">("Todos");
 
-  const filteredOrders = orders.filter((o) => {
-    if (filter === "Todos") return true;
-    return o.status === filter;
-  });
+  const filteredOrders = useMemo(() => {
+    if (filter === "Todos") return orders;
+    return orders.filter((o) => o.status === filter);
+  }, [orders, filter]);
 
   const renderOrder = ({ item }: { item: Order }) => (
     <Link href={{ pathname: "/orders/[id]", params: { id: item.id } }} asChild>
@@ -122,8 +57,10 @@ export default function OrdersScreen() {
           <View style={styles.deliveryInfo}>
             <MaterialCommunityIcons name="calendar" size={16} color="#666" />
             <Text style={styles.deliveryText}>
-              {new Date(item.deliveryDate).toLocaleDateString("pt-BR")} às{" "}
-              {item.deliveryTime}
+              {new Date(item.deliveryDate).toLocaleDateString("pt-BR", {
+                timeZone: "UTC",
+              })}{" "}
+              às {item.deliveryTime}
             </Text>
           </View>
         </View>
@@ -138,9 +75,29 @@ export default function OrdersScreen() {
     </Link>
   );
 
+  // 3. Adicionar telas de loading e erro
+  if (isLoading && !orders.length) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={PINK} />
+        <Text style={styles.loadingText}>Carregando pedidos...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={refetch} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Tentar Novamente</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Filtros de Status */}
       <View style={styles.header}>
         <ScrollView
           horizontal
@@ -193,6 +150,14 @@ export default function OrdersScreen() {
             <Text style={styles.emptyText}>Nenhum pedido encontrado.</Text>
           </View>
         )}
+        // 4. Adicionar "puxar para atualizar"
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={refetch}
+            colors={[PINK]}
+          />
+        }
       />
     </View>
   );
@@ -200,7 +165,7 @@ export default function OrdersScreen() {
 
 const getStatusColor = (status: OrderStatus) => {
   const colors: Record<OrderStatus, string> = {
-    pendente: "#F59E0B",
+    pending: "#F59E0B",
     confirmed: "#3B82F6",
     production: "#8B5CF6",
     ready: "#10B981",
@@ -214,6 +179,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: LIGHT_GRAY,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#555",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#D32F2F",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: PINK,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   header: {
     backgroundColor: "white",
