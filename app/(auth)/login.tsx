@@ -61,7 +61,7 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerSection}>
-          <Text style={styles.title}>ConfeitApp</Text>
+          <Text style={styles.title}>Doce Ponto</Text>
           <Text style={styles.subtitle}>Gerencie sua confeitaria</Text>
         </View>
 
