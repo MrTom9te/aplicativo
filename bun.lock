@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "confeitapp",
+      "name": "Doce Ponto",
       "dependencies": {
         "@expo/vector-icons": "^15.0.2",
         "@react-navigation/native": "^7.1.8",
