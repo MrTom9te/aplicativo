@@ -5,25 +5,67 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import "react-native-reanimated";
-import { AuthContext, AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "react-native";
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from "expo-router";
+export { ErrorBoundary } from "expo-router";
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: "(tabs)",
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+function RootLayoutNav() {
+  const colorScheme = useColorScheme();
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading) {
+      return; // Não faz nada enquanto o AuthContext está carregando
+    }
+
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (user && inAuthGroup) {
+      // CORREÇÃO: Se o usuário está logado E AINDA ESTÁ no grupo de autenticação,
+      // ele é redirecionado para a tela principal.
+      router.replace("/(tabs)");
+    } else if (!user && !inAuthGroup) {
+      // Se o usuário NÃO está logado e NÃO está no grupo de autenticação,
+      // ele é redirecionado para o login.
+      router.replace("/(auth)/login");
+    }
+  }, [user, isLoading, segments, router]);
+
+  if (isLoading) {
+    return null; // A tela de splash continua visível
+  }
+
+  return (
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="products/new" options={{ title: "Novo Produto" }} />
+        <Stack.Screen
+          name="products/[id]"
+          options={{ title: "Editar Produto" }}
+        />
+        <Stack.Screen
+          name="orders/[id]"
+          options={{ title: "Detalhes do Pedido" }}
+        />
+      </Stack>
+    </ThemeProvider>
+  );
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -31,7 +73,6 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -46,20 +87,9 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        </Stack>
-      </ThemeProvider>
+      <RootLayoutNav />
     </AuthProvider>
   );
 }
