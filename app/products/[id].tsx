@@ -3,231 +3,293 @@ import {
   View,
   Text,
   TextInput,
-  Button,
   StyleSheet,
-  Image,
-  Alert,
   TouchableOpacity,
+  Image,
   ScrollView,
+  Alert,
+  Platform,
   ActivityIndicator,
+  Switch,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useProducts } from "@/hooks/useProducts";
+import { Product, UpdateProductRequest } from "@/types/products.types";
+import api from "@/lib/api";
+import { SucessResponse } from "@/types/api.types";
 
-// Mock data fetching function - replace with your actual API call
-const fetchProductById = async (id: string) => {
-  console.log(`Buscando dados para o produto com ID: ${id}`);
-  // Simula um atraso de rede
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {
-    id,
-    name: "Bolo de Chocolate (Exemplo)",
-    description: "Um delicioso bolo de chocolate para festas.",
-    price: "45.50",
-    imageUrl: `https://via.placeholder.com/400x300.png?text=Produto+${id}`, // URL da imagem existente
-  };
-};
+const PINK = "#FF69B4";
+const DARK_GRAY = "#333333";
+const RED_ERROR = "#D32F2F";
 
 export default function EditProductScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { updateProduct } = useProducts();
 
+  const [product, setProduct] = useState<Product | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
-  // O estado da imagem agora pode conter a URL existente ou a nova imagem (uri local + base64)
-  const [image, setImage] = useState<{
-    uri: string | null;
-    base64: string | null;
-  }>({ uri: null, base64: null });
-  const [loading, setLoading] = useState(true);
+  const [isActive, setIsActive] = useState(true);
+  const [newImageBase64, setNewImageBase64] = useState<string | null>(null);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof id === "string") {
-      const loadProductData = async () => {
-        try {
-          const product = await fetchProductById(id);
-          setName(product.name);
-          setDescription(product.description);
-          setPrice(product.price);
-          setImage({ uri: product.imageUrl, base64: null }); // Define a imagem inicial com a URL existente
-        } catch (error) {
-          Alert.alert("Erro", "Não foi possível carregar os dados do produto.");
-        } finally {
-          setLoading(false);
+    if (!id) return;
+
+    const fetchProduct = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.get<SucessResponse<Product>>(
+          `/products/${id}`,
+        );
+        if (response.data.success && response.data.data) {
+          const fetchedProduct = response.data.data;
+          setProduct(fetchedProduct);
+          setName(fetchedProduct.name);
+          setDescription(fetchedProduct.description);
+          setPrice(String(fetchedProduct.price).replace(".", ","));
+          setIsActive(fetchedProduct.isActive);
+        } else {
+          throw new Error("Produto não encontrado.");
         }
-      };
-      loadProductData();
-    }
+      } catch (e) {
+        setError("Não foi possível carregar o produto.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProduct();
   }, [id]);
 
   const pickImage = async () => {
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert(
-        "Permissão Necessária",
-        "É necessário permitir o acesso à galeria.",
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.5,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets && result.assets[0].base64) {
-      const selected = result.assets[0];
-      // Atualiza o estado com a nova imagem (URI local para preview e base64 para envio)
-      setImage({
-        uri: selected.uri,
-        base64: `data:image/jpeg;base64,${selected.base64}`,
+    // ... (código do pickImage é o mesmo da tela de criação)
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.5,
+        base64: true,
       });
+
+      if (!result.canceled && result.assets && result.assets[0].base64) {
+        const base64String = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        setNewImageBase64(base64String);
+      }
+    } catch (e) {
+      setError("Não foi possível carregar a imagem.");
     }
   };
 
-  const handleUpdate = () => {
-    if (!name || !description || !price) {
-      Alert.alert("Erro", "Por favor, preencha todos os campos.");
-      return;
-    }
+  const handleUpdate = async () => {
+    if (!id) return;
+    setError(null);
 
-    // Constrói o payload para a API
-    const productUpdateData: {
-      name: string;
-      description: string;
-      price: number;
-      imageBase64?: string | null;
-    } = {
+    const productData: UpdateProductRequest = {
       name,
       description,
-      price: parseFloat(price),
+      price: parseFloat(price.replace(",", ".")),
+      isActive,
     };
 
-    // Adiciona a imagem base64 ao payload APENAS se uma nova imagem foi selecionada
-    if (image?.base64) {
-      productUpdateData.imageBase64 = image.base64;
+    if (newImageBase64) {
+      productData.imageBase64 = newImageBase64;
     }
 
-    console.log(
-      `Enviando atualização para o produto ID ${id}:`,
-      productUpdateData,
-    );
-    Alert.alert(
-      "Sucesso",
-      "Produto atualizado (simulação). Verifique o console.",
-    );
-    // Aqui você faria a chamada real para a API (PUT /api/products/:id)
-    // Ex: await api.put(`/products/${id}`, productUpdateData);
-    router.back();
+    try {
+      setIsSubmitting(true);
+      await updateProduct(id, productData);
+      router.back();
+    } catch (e: any) {
+      setError(e.message || "Falha ao atualizar o produto.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text>Carregando produto...</Text>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={PINK} />
+      </View>
+    );
+  }
+
+  if (error && !product) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.headerTitle}>Editar Produto</Text>
+    <>
+      <Stack.Screen options={{ title: "Editar Produto" }} />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+      >
+        <Text style={styles.label}>Foto do Produto</Text>
+        <TouchableOpacity
+          style={styles.imagePicker}
+          onPress={pickImage}
+          disabled={isSubmitting}
+        >
+          <Image
+            source={{ uri: newImageBase64 || product?.imageUrl }}
+            style={styles.previewImage}
+          />
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-        {image?.uri ? (
-          <Image source={{ uri: image.uri }} style={styles.previewImage} />
-        ) : (
-          <Text style={styles.imagePickerText}>
-            Toque para adicionar uma foto
-          </Text>
-        )}
-      </TouchableOpacity>
+        <Text style={styles.label}>Nome do Produto</Text>
+        <TextInput
+          style={styles.input}
+          value={name}
+          onChangeText={setName}
+          editable={!isSubmitting}
+        />
 
-      <Text style={styles.label}>Nome do produto</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} />
+        <Text style={styles.label}>Descrição</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          editable={!isSubmitting}
+        />
 
-      <Text style={styles.label}>Descrição</Text>
-      <TextInput
-        style={styles.input}
-        value={description}
-        onChangeText={setDescription}
-        multiline
-        numberOfLines={4}
-      />
+        <Text style={styles.label}>Preço (R$)</Text>
+        <TextInput
+          style={styles.input}
+          value={price}
+          onChangeText={(text) => setPrice(text.replace(/[^0-9,]/g, ""))}
+          keyboardType="numeric"
+          editable={!isSubmitting}
+        />
 
-      <Text style={styles.label}>Preço</Text>
-      <TextInput
-        style={styles.input}
-        value={price}
-        onChangeText={setPrice}
-        keyboardType="numeric"
-      />
+        <View style={styles.switchContainer}>
+          <Text style={styles.label}>Produto Ativo</Text>
+          <Switch
+            value={isActive}
+            onValueChange={setIsActive}
+            disabled={isSubmitting}
+          />
+        </View>
+        <Text style={styles.switchHelperText}>
+          Produtos inativos não aparecem no seu site de vendas.
+        </Text>
 
-      <View style={styles.buttonContainer}>
-        <Button title="Salvar Alterações" onPress={handleUpdate} />
-      </View>
-    </ScrollView>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
+        <TouchableOpacity
+          style={[styles.button, isSubmitting && styles.buttonDisabled]}
+          onPress={handleUpdate}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Salvar Alterações</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#f8f9fa",
   },
-  loadingContainer: {
+  centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
+  contentContainer: {
+    padding: 20,
   },
   label: {
     fontSize: 16,
+    fontWeight: "600",
+    color: DARK_GRAY,
     marginBottom: 8,
-    color: "#333",
   },
   input: {
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 10,
+    borderColor: "#ced4da",
     borderRadius: 8,
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     fontSize: 16,
+    marginBottom: 20,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: "top",
   },
   imagePicker: {
-    width: "100%",
     height: 200,
+    width: "100%",
+    backgroundColor: "#e9ecef",
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#ddd",
-    borderStyle: "dashed",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f9f9f9",
     marginBottom: 20,
-  },
-  imagePickerText: {
-    color: "#aaa",
+    borderWidth: 1,
+    borderColor: "#ced4da",
+    overflow: "hidden",
   },
   previewImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 8,
+    resizeMode: "cover",
   },
-  buttonContainer: {
-    marginTop: 20,
-    marginBottom: 40, // Adiciona espaço no final do scroll
+  switchContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ced4da",
+  },
+  switchHelperText: {
+    fontSize: 12,
+    color: "#6c757d",
+    marginBottom: 30,
+    paddingHorizontal: 5,
+  },
+  errorText: {
+    color: RED_ERROR,
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  button: {
+    backgroundColor: PINK,
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  buttonDisabled: {
+    backgroundColor: "#FFC0CB",
   },
 });

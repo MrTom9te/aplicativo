@@ -1,30 +1,36 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Switch,
-  ScrollView,
-  Alert,
-  Platform,
-} from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useRouter } from "expo-router";
-import CustomButton from "@/components/CustomButton";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
+import { useProducts } from "@/hooks/useProducts";
+import type { CreateProductRequest } from "@/types/products.types";
+
+const PINK = "#FF69B4";
+const DARK_GRAY = "#333333";
+const RED_ERROR = "#D32F2F";
 
 export default function NewProductScreen() {
   const router = useRouter();
+  const { createProduct } = useProducts();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [isActive, setIsActive] = useState(true);
 
-  // Request permission on component mount (for web and mobile)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     (async () => {
       if (Platform.OS !== "web") {
@@ -41,87 +47,52 @@ export default function NewProductScreen() {
   }, []);
 
   const pickImage = async () => {
+    setError(null);
     try {
-      let result = await ImagePicker.launchImageLibraryAsync({
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.5, // Reduce quality to keep Base64 string smaller
-        base64: true, // This is the key change
+        quality: 0.5,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets[0].base64) {
-        // The Base64 string is prefixed with `data:image/jpeg;base64,` which is what many systems expect
         const base64String = `data:image/jpeg;base64,${result.assets[0].base64}`;
         setImageBase64(base64String);
       }
-    } catch (error) {
-      console.error("Erro ao selecionar imagem: ", error);
-      Alert.alert(
-        "Erro",
-        "Não foi possível carregar a imagem. Tente novamente.",
-      );
+    } catch (e) {
+      setError("Não foi possível carregar a imagem. Tente novamente.");
     }
-  };
-
-  const handlePriceChange = (text: string) => {
-    // Allow only numbers and a single comma or dot for decimals
-    const formattedText = text.replace(/[^0-9,.]/g, "").replace(",", ".");
-    setPrice(formattedText);
   };
 
   const handleSubmit = async () => {
-    // Simple validation
+    setError(null);
     if (!name.trim() || !description.trim() || !price.trim()) {
-      Alert.alert(
-        "Campos obrigatórios",
-        "Por favor, preencha nome, descrição e preço.",
-      );
+      setError("Por favor, preencha nome, descrição e preço.");
+      return;
+    }
+    if (!imageBase64) {
+      setError("Por favor, adicione uma foto para o produto.");
       return;
     }
 
-    const productData = {
+    const productData: CreateProductRequest = {
       name,
       description,
-      price: parseFloat(price), // API expects a number
-      imageBase64, // Can be null if no image is selected
+      price: parseFloat(price.replace(",", ".")),
+      imageBase64,
     };
 
-    console.log(
-      "Enviando para a API:",
-      `Nome: ${productData.name}, Preço: ${productData.price}, Imagem Base64: ${productData.imageBase64 ? productData.imageBase64.substring(0, 50) + "..." : "Nenhuma"}`,
-    );
-    Alert.alert(
-      "Produto Salvo (Simulação)",
-      "Os dados do produto foram impressos no console.",
-    );
-
-    // --- LÓGICA DE INTEGRAÇÃO COM A API IRIA AQUI ---
-    /*
     try {
-      // Exemplo de como seria a chamada à API
-      const response = await fetch('http://localhost:3000/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': 'Bearer SEU_TOKEN_JWT',
-        },
-        body: JSON.stringify(productData),
-      });
-
-      const responseData = await response.json();
-
-      if (response.ok) {
-        Alert.alert('Sucesso!', 'Produto criado com sucesso.');
-        router.back(); // Volta para a lista de produtos
-      } else {
-        throw new Error(responseData.error || 'Falha ao criar produto');
-      }
-    } catch (error) {
-      console.error('Erro ao criar produto:', error);
-      Alert.alert('Erro na API', error.message);
+      setIsSubmitting(true);
+      await createProduct(productData);
+      router.back(); // Volta para a lista de produtos
+    } catch (e: any) {
+      setError(e.message || "Falha ao criar o produto.");
+    } finally {
+      setIsSubmitting(false);
     }
-    */
   };
 
   return (
@@ -132,7 +103,11 @@ export default function NewProductScreen() {
         contentContainerStyle={styles.contentContainer}
       >
         <Text style={styles.label}>Foto do Produto</Text>
-        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+        <TouchableOpacity
+          style={styles.imagePicker}
+          onPress={pickImage}
+          disabled={isSubmitting}
+        >
           {imageBase64 ? (
             <Image source={{ uri: imageBase64 }} style={styles.previewImage} />
           ) : (
@@ -149,6 +124,7 @@ export default function NewProductScreen() {
           value={name}
           onChangeText={setName}
           maxLength={100}
+          editable={!isSubmitting}
         />
 
         <Text style={styles.label}>Descrição</Text>
@@ -159,43 +135,32 @@ export default function NewProductScreen() {
           onChangeText={setDescription}
           multiline
           maxLength={500}
+          editable={!isSubmitting}
         />
 
         <Text style={styles.label}>Preço (R$)</Text>
         <TextInput
           style={styles.input}
-          placeholder="Ex: 45.50"
+          placeholder="Ex: 45,50"
           value={price}
-          onChangeText={handlePriceChange}
+          onChangeText={(text) => setPrice(text.replace(/[^0-9,]/g, ""))}
           keyboardType="numeric"
+          editable={!isSubmitting}
         />
 
-        <View style={styles.switchContainer}>
-          <Text style={styles.label}>Produto Ativo</Text>
-          <Switch
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={isActive ? "#f5dd4b" : "#f4f3f4"}
-            ios_backgroundColor="#3e3e3e"
-            onValueChange={() => setIsActive((previousState) => !previousState)}
-            value={isActive}
-          />
-        </View>
-        <Text style={styles.switchHelperText}>
-          Produtos inativos não aparecem no seu site de vendas.
-        </Text>
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
-        <View style={styles.buttonGroup}>
-          <CustomButton
-            title="Cancelar"
-            onPress={() => router.back()}
-            style={styles.cancelButton}
-          />
-          <CustomButton
-            title="Salvar Produto"
-            onPress={handleSubmit}
-            style={styles.button}
-          />
-        </View>
+        <TouchableOpacity
+          style={[styles.button, isSubmitting && styles.buttonDisabled]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Salvar Produto</Text>
+          )}
+        </TouchableOpacity>
       </ScrollView>
     </>
   );
@@ -212,7 +177,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#343a40",
+    color: DARK_GRAY,
     marginBottom: 8,
   },
   input: {
@@ -240,7 +205,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#ced4da",
     borderStyle: "dashed",
-    overflow: "hidden", // Ensures the image respects the border radius
+    overflow: "hidden",
   },
   imagePickerText: {
     color: "#6c757d",
@@ -251,41 +216,24 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "cover",
   },
-  switchContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  switchHelperText: {
-    fontSize: 12,
-    color: "#6c757d",
-    marginBottom: 30,
-  },
-  buttonGroup: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 20,
+  errorText: {
+    color: RED_ERROR,
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 20,
   },
   button: {
-    backgroundColor: "#007bff",
+    backgroundColor: PINK,
     paddingVertical: 15,
     borderRadius: 8,
     alignItems: "center",
-    flex: 1,
   },
   buttonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
   },
-  cancelButton: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "#6c757d",
-    marginRight: 10,
-  },
-  cancelButtonText: {
-    color: "#6c757d",
+  buttonDisabled: {
+    backgroundColor: "#FFC0CB", // Lighter pink
   },
 });
