@@ -1,4 +1,4 @@
-# ConfeitApp - Especificação da API
+# Doce Ponto - Especificação da API
 
 ## Base URL
 ```
