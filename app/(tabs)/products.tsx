@@ -1,106 +1,43 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  Switch,
-  TextInput,
-} from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Link } from "expo-router";
+import React, { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+import { useProducts } from "@/hooks/useProducts";
+import type { Product } from "@/types/products.types";
 
 const PINK = "#FF69B4";
 const LIGHT_GRAY = "#F7F7F7";
 const DARK_GRAY = "#333333";
 
-// Dados mocados para simular a lista de produtos
-const mockProducts = [
-  {
-    id: "1",
-    name: "Bolo de Chocolate",
-    price: 45.0,
-    imageUrl: "https://picsum.photos/seed/1/200",
-    isActive: true,
-  },
-  {
-    id: "2",
-    name: "Torta de Morango",
-    price: 55.5,
-    imageUrl: "https://picsum.photos/seed/2/200",
-    isActive: true,
-  },
-  {
-    id: "3",
-    name: "Caixa de Brigadeiros (20 un)",
-    price: 30.0,
-    imageUrl: "https://picsum.photos/seed/3/200",
-    isActive: false,
-  },
-  {
-    id: "4",
-    name: "Bolo de Cenoura com Cobertura",
-    price: 40.0,
-    imageUrl: "https://picsum.photos/seed/4/200",
-    isActive: true,
-  },
-];
-
-/**
- * @typedef {object} Product
- * @property {string} id - O identificador único do produto.
- * @property {string} name - O nome do produto.
- * @property {number} price - O preço do produto.
- * @property {string} imageUrl - A URL da imagem do produto.
- * @property {boolean} isActive - O status do produto (ativo ou inativo).
- */
-type Product = (typeof mockProducts)[0];
-
-/**
- * @file app/(tabs)/products.tsx
- * @brief Tela de Produtos da confeiteira.
- *
- * Este componente exibe uma lista de todos os produtos cadastrados, permitindo
- * a filtragem por status (Todos, Ativos, Inativos) e uma busca por nome.
- * A confeiteira pode ativar/desativar um produto diretamente da lista e acessar
- * a tela de edição ou de criação de um novo produto.
- *
- * @component ProductsScreen
- *
- * @returns {JSX.Element} Uma tela para gerenciamento de produtos com lista, filtros e busca.
- *
- * @example
- * // Este componente é uma tela e deve ser usado como uma rota dentro do `expo-router`
- * // e renderizado como uma aba, conforme configurado em `app/(tabs)/_layout.tsx`.
- * // <Tabs.Screen name="products" options={{ title: "Produtos" }} />
- */
 export default function ProductsScreen() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const { products, isLoading, error, refetch, toggleProductStatus } =
+    useProducts();
+
   const [filter, setFilter] = useState("Todos");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  /**
-   * @brief Alterna o status de um produto (ativo/inativo) com base no seu ID.
-   * @param {string} id - O ID do produto a ser atualizado.
-   */
-  const toggleProductStatus = (id: string) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isActive: !p.isActive } : p)),
-    );
-  };
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((p) => {
+        if (filter === "Ativos") return p.isActive;
+        if (filter === "Inativos") return !p.isActive;
+        return true;
+      })
+      .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [products, filter, searchQuery]);
 
-  const filteredProducts = products.filter((p) => {
-    if (filter === "Ativos") return p.isActive;
-    if (filter === "Inativos") return !p.isActive;
-    return true;
-  });
-
-  /**
-   * @brief Renderiza um único item de produto para a FlatList.
-   * @param {{ item: Product }} props - As propriedades contendo o item do produto.
-   * @returns {JSX.Element} Um componente de cartão de produto com informações e ações.
-   */
   const renderProduct = ({ item }: { item: Product }) => (
     <View style={styles.productCard}>
       <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
@@ -111,13 +48,12 @@ export default function ProductsScreen() {
       <View style={styles.productActions}>
         <Switch
           value={item.isActive}
-          onValueChange={() => toggleProductStatus(item.id)}
+          onValueChange={(newStatus) => toggleProductStatus(item.id, newStatus)}
           trackColor={{ false: "#ccc", true: "#fcd4e7" }}
           thumbColor={item.isActive ? PINK : "#f4f3f4"}
         />
-
         <Link
-          href={{ pathname: "/products/:id", params: { id: item.id } }}
+          href={{ pathname: "/products/[id]", params: { id: item.id } }}
           asChild
         >
           <TouchableOpacity style={styles.iconButton}>
@@ -132,15 +68,36 @@ export default function ProductsScreen() {
     </View>
   );
 
+  if (isLoading && !products.length) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={PINK} />
+        <Text style={styles.loadingText}>Carregando produtos...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={refetch} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Tentar Novamente</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Barra de Busca e Filtros */}
       <View style={styles.header}>
         <View style={styles.searchBar}>
           <MaterialCommunityIcons name="magnify" size={22} color="#999" />
           <TextInput
             style={styles.searchInput}
             placeholder="Buscar produto..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
         <View style={styles.filterContainer}>
@@ -172,11 +129,20 @@ export default function ProductsScreen() {
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Nenhum produto encontrado.</Text>
+            <Text style={styles.emptySubText}>
+              Use o botão '+' para adicionar seu primeiro produto.
+            </Text>
           </View>
         )}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={refetch}
+            colors={[PINK]}
+          />
+        }
       />
 
-      {/* Botão Flutuante para adicionar novo produto */}
       <Link href="/products/new" asChild>
         <TouchableOpacity style={styles.fab}>
           <MaterialCommunityIcons name="plus" size={28} color="white" />
@@ -190,6 +156,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: LIGHT_GRAY,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#555",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#D32F2F",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: PINK,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   header: {
     backgroundColor: "white",
@@ -298,7 +292,13 @@ const styles = StyleSheet.create({
     marginTop: 100,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#555",
+  },
+  emptySubText: {
+    fontSize: 14,
     color: "#888",
+    marginTop: 8,
   },
 });
