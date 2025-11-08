@@ -118,7 +118,7 @@ export default function RegisterScreen() {
             <Text style={styles.label}>Telefone</Text>
             <TextInput
               style={styles.input}
-              placeholder="(55) 92999887766"
+              placeholder="(dd) 9 9988-7766"
               keyboardType="phone-pad"
               editable={!isLoading}
               value={phone}
