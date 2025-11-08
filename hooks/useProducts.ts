@@ -124,5 +124,6 @@ export const useProducts = () => {
     refetch: fetchProducts,
     toggleProductStatus,
     createProduct,
+    updateProduct,
   };
 };
