@@ -1,78 +1,75 @@
-import React, { JSX } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
-import { useAuth } from "@/contexts/AuthContext";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Link } from "expo-router";
+import type React from "react";
+import { useMemo } from "react";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrders } from "@/hooks/useOrders";
+import { useProducts } from "@/hooks/useProducts";
+import type { Order, OrderStatus } from "@/types/orders.types";
 
 const PINK = "#FF69B4";
 const LIGHT_GRAY = "#F7F7F7";
 const DARK_GRAY = "#333333";
 
-// Dados mocados
-const summaryData = {
-  pedidosHoje: 5,
-  pedidosPendentes: 2,
-  produtosAtivos: 12,
-  ultimoPedido: {
-    cliente: "Ana Souza",
-    tempo: "há 15 minutos",
-  },
-};
-
-const recentOrders = [
-  {
-    id: "1",
-    cliente: "Carlos Pereira",
-    produto: "Bolo de Chocolate",
-    status: "Pendente",
-    hora: "14:00",
-  },
-  {
-    id: "2",
-    cliente: "Juliana Costa",
-    produto: "Torta de Limão",
-    status: "Em Produção",
-    hora: "16:30",
-  },
-  {
-    id: "3",
-    cliente: "Marcos Lima",
-    produto: "Caixa de Brigadeiros",
-    status: "Pronto",
-    hora: "11:00",
-  },
-];
-
-/**
- * @file app/(tabs)/index.tsx
- * @brief Tela inicial (Dashboard) da aplicação para a confeiteira.
- *
- * Este componente serve como o dashboard principal, exibindo um resumo do dia da confeiteira.
- * Inclui informações sobre pedidos (feitos hoje, pendentes), produtos ativos e o último pedido recebido.
- * Também lista os pedidos recentes e fornece um link para a tela de 'Meus Pedidos'.
- *
- * @component HomeScreen
- *
- * @returns {JSX.Element} Uma tela de dashboard com cards de resumo e uma lista de pedidos recentes.
- *
- * @example
- * // Este componente é uma tela e deve ser usado como uma rota dentro do `expo-router`
- * // e renderizado como uma aba, conforme configurado em `app/(tabs)/_layout.tsx`.
- * // <Tabs.Screen name="index" options={{ title: "Início", headerTitle: "Dashboard" }} />
- */
 export default function HomeScreen() {
   const { user } = useAuth();
+  const {
+    products,
+    isLoading: isLoadingProducts,
+    refetch: refetchProducts,
+  } = useProducts();
+  const {
+    orders,
+    isLoading: isLoadingOrders,
+    refetch: refetchOrders,
+  } = useOrders();
 
-  /**
-   * @brief Retorna uma saudação apropriada baseada na hora atual do dia.
-   * @returns {string} Uma string de saudação (e.g., "Bom dia", "Boa tarde", "Boa noite").
-   */
+  const isRefreshing = isLoadingProducts || isLoadingOrders;
+
+  const onRefresh = () => {
+    refetchProducts();
+    refetchOrders();
+  };
+
+  // Usamos useMemo para calcular os dados do resumo de forma eficiente
+  const summaryData = useMemo(() => {
+    const today = new Date().setHours(0, 0, 0, 0);
+
+    const pedidosHoje = orders.filter(
+      (order) => new Date(order.createdAt).setHours(0, 0, 0, 0) === today,
+    );
+
+    const pedidosPendentes = orders.filter(
+      (order) => order.status === "pending",
+    );
+
+    const produtosAtivos = products.filter((product) => product.isActive);
+
+    const ultimoPedido = orders.length > 0 ? orders[0] : null;
+
+    return {
+      pedidosHoje: pedidosHoje.length,
+      pedidosPendentes: pedidosPendentes.length,
+      produtosAtivos: produtosAtivos.length,
+      ultimoPedido: ultimoPedido
+        ? {
+            cliente: ultimoPedido.customerName,
+            tempo: `Pedido #${ultimoPedido.orderNumber}`,
+          }
+        : { cliente: "Nenhum pedido", tempo: "ainda" },
+      recentOrders: pedidosHoje.slice(0, 3), // Pega os 3 primeiros de hoje
+    };
+  }, [orders, products]);
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Bom dia";
@@ -80,19 +77,31 @@ export default function HomeScreen() {
     return "Boa noite";
   };
 
+  if (isRefreshing && !orders.length && !products.length) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={PINK} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header de boas-vindas */}
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={styles.welcomeHeader}>
-        <Text
-          style={styles.greeting}
-        >{`${getGreeting()}, ${user?.name.split(" ")[0]}!`}</Text>
+        <Text style={styles.greeting}>{`${getGreeting()}, ${
+          user?.name.split(" ")[0]
+        }!`}</Text>
         <Text style={styles.welcomeMessage}>
           Aqui está o resumo do seu dia:
         </Text>
       </View>
 
-      {/* Cards de Resumo */}
       <View style={styles.summaryGrid}>
         <SummaryCard
           icon="package-variant-closed"
@@ -121,7 +130,6 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* Lista de Pedidos Recentes */}
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Pedidos de Hoje</Text>
@@ -132,9 +140,9 @@ export default function HomeScreen() {
           </Link>
         </View>
 
-        {recentOrders.length > 0 ? (
+        {summaryData.recentOrders.length > 0 ? (
           <View style={styles.orderList}>
-            {(recentOrders as RecentOrder[]).map((order: RecentOrder) => (
+            {summaryData.recentOrders.map((order) => (
               <OrderCard key={order.id} order={order} />
             ))}
           </View>
@@ -148,24 +156,8 @@ export default function HomeScreen() {
   );
 }
 
-// Tipos locais para os componentes
-interface RecentOrder {
-  id: string;
-  cliente: string;
-  produto: string;
-  status: "Pendente" | "Em Produção" | "Pronto";
-  hora: string;
-}
+// --- Componentes Auxiliares (SummaryCard, OrderCard, etc.) ---
 
-/**
- * @typedef {object} SummaryCardProps
- * @property {React.ComponentProps<typeof MaterialCommunityIcons>["name"]} icon - Nome do ícone da comunidade de materiais a ser exibido no cartão.
- * @property {string} title - Título do cartão de resumo.
- * @property {string} color - Cor primária do cartão (usada para o ícone e a borda esquerda).
- * @property {number} [value] - Valor numérico a ser exibido no cartão (opcional).
- * @property {string} [text] - Texto principal a ser exibido no cartão (opcional, usado em vez de `value`).
- * @property {string} [subtext] - Subtexto a ser exibido abaixo do texto principal (opcional).
- */
 interface SummaryCardProps {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
   title: string;
@@ -175,13 +167,6 @@ interface SummaryCardProps {
   subtext?: string;
 }
 
-/**
- * @brief Um cartão de resumo reutilizável para exibir estatísticas ou informações rápidas.
- *
- * @component SummaryCard
- * @param {SummaryCardProps} props - As propriedades para configurar o cartão de resumo.
- * @returns {JSX.Element} Um cartão de resumo estilizado com ícone, título e valor/texto.
- */
 const SummaryCard: React.FC<SummaryCardProps> = ({
   icon,
   title,
@@ -189,7 +174,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
   text,
   subtext,
   color,
-}: SummaryCardProps): JSX.Element => (
+}) => (
   <View style={[styles.card, { borderLeftColor: color }]}>
     <MaterialCommunityIcons name={icon} size={28} color={color} />
     <View style={styles.cardContent}>
@@ -201,43 +186,40 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
   </View>
 );
 
-/**
- * @brief Um cartão reutilizável para exibir informações de um único pedido recente.
- *
- * @component OrderCard
- * @param {{ order: RecentOrder }} props - As propriedades contendo os dados do pedido.
- * @returns {JSX.Element} Um componente de cartão de pedido clicável.
- */
-const OrderCard: React.FC<{ order: RecentOrder }> = ({ order }) => (
-  <TouchableOpacity style={styles.orderCard}>
-    <View style={styles.orderInfo}>
-      <Text style={styles.orderClient}>{order.cliente}</Text>
-      <Text style={styles.orderProduct}>{order.produto}</Text>
-    </View>
-    <View style={styles.orderStatusContainer}>
-      <Text style={[styles.orderStatus, getStatusStyle(order.status)]}>
-        {order.status}
-      </Text>
-      <Text style={styles.orderTime}>{order.hora}</Text>
-    </View>
-  </TouchableOpacity>
+const OrderCard: React.FC<{ order: Order }> = ({ order }) => (
+  <Link href={{ pathname: "/orders/[id]", params: { id: order.id } }} asChild>
+    <TouchableOpacity style={styles.orderCard}>
+      <View style={styles.orderInfo}>
+        <Text style={styles.orderClient}>{order.customerName}</Text>
+        <Text style={styles.orderProduct}>{order.productName}</Text>
+      </View>
+      <View style={styles.orderStatusContainer}>
+        <Text
+          style={[
+            styles.orderStatus,
+            getStatusStyle(order.status as OrderStatus),
+          ]}
+        >
+          {order.status}
+        </Text>
+        <Text style={styles.orderTime}>{order.deliveryTime}</Text>
+      </View>
+    </TouchableOpacity>
+  </Link>
 );
 
-/**
- * @brief Retorna um objeto de estilo condicional com base no status do pedido.
- * @param {RecentOrder["status"]} status - O status do pedido ('Pendente', 'Em Produção', 'Pronto').
- * @returns {object} Um objeto contendo `color` e `backgroundColor` para o status.
- */
-const getStatusStyle = (status: RecentOrder["status"]) => {
+const getStatusStyle = (status: OrderStatus) => {
   switch (status) {
-    case "Pendente":
-      return { color: "#F59E0B", backgroundColor: "#FEF3C7" };
-    case "Em Produção":
-      return { color: "#3B82F6", backgroundColor: "#DBEAFE" };
-    case "Pronto":
-      return { color: "#10B981", backgroundColor: "#D1FAE5" };
+    case "pending":
+      return { color: "#D97706", backgroundColor: "#FEF3C7" };
+    case "confirmed":
+      return { color: "#2563EB", backgroundColor: "#DBEAFE" };
+    case "production":
+      return { color: "#7C3AED", backgroundColor: "#EDE9FE" };
+    case "ready":
+      return { color: "#059669", backgroundColor: "#D1FAE5" };
     default:
-      return { color: "#6B7280", backgroundColor: "#F3F4F6" };
+      return { color: "#4B5563", backgroundColor: "#F3F4F6" };
   }
 };
 
@@ -246,6 +228,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: LIGHT_GRAY,
     paddingHorizontal: 16,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   welcomeHeader: {
     paddingVertical: 24,
@@ -364,7 +351,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    overflow: "hidden", // Garante que o borderRadius funcione no Text
+    overflow: "hidden",
+    textTransform: "capitalize",
   },
   orderTime: {
     fontSize: 14,
