@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Link } from "expo-router";
-import { Order, OrderStatus } from "@/types/lib";
+import { Order, OrderStatus } from "@/types/orders.types";
 
 const PINK = "#FF69B4";
 const LIGHT_GRAY = "#F7F7F7";
