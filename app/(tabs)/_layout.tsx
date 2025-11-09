@@ -1,30 +1,8 @@
-import React from "react";
-import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import Colors from "@/constants/Colors";
+import { Tabs } from "expo-router";
 
 const PINK = "#FF69B4";
 
-/**
- * @file app/(tabs)/_layout.tsx
- * @brief Layout principal para as telas com navegação por abas na aplicação.
- *
- * Este componente define a estrutura de navegação por abas (`Tabs`) para as
- * principais seções da aplicação (Início/Dashboard, Produtos e Pedidos).
- * Ele configura o estilo visual das abas, incluindo cores de ícones e texto,
- * o estilo da barra de abas e as opções de cabeçalho para cada tela.
- *
- * @component TabLayout
- *
- * @returns {JSX.Element} Um componente `Tabs` do `expo-router` configurado
- * com as telas principais da aplicação.
- *
- * @example
- * // Este layout é automaticamente aplicado às rotas dentro do diretório (tabs).
- * // Não é necessário importá-lo ou usá-lo diretamente em outros componentes.
- * // As telas `index.tsx`, `products.tsx` e `orders.tsx` dentro de `(tabs)`
- * // serão renderizadas com este layout de abas.
- */
 export default function TabLayout() {
   return (
     <Tabs
