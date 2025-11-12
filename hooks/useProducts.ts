@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
-import {
-  ApiResult,
-  ErrorResponse,
-  type SucessResponse,
-} from "@/types/api.types";
+import { ApiResult, ErrorResponse } from "@/types/api.types";
 import type {
   CreateProductRequest,
   Product,
@@ -22,16 +18,21 @@ export const useProducts = () => {
       setIsLoading(true);
       setError(null);
 
-      const response = await api.get<SucessResponse<Product[]>>("/products");
+      const response = await api.get<ApiResult<Product[]>>("/products");
 
-      if (response.data.success && response.data.data) {
-        setProducts(response.data.data);
+      if (response.data.success) {
+        setProducts(response.data.data || []);
       } else {
-        throw new Error("Nao foi possivel  carregar os produtos.");
+        setError(
+          (response.data as ErrorResponse).error ||
+            "Não foi possível carregar os produtos.",
+        );
+        setProducts([]); // Esvazia a lista de produtos em caso de erro
       }
     } catch (e: any) {
       console.error("Falha ao buscar produtos:", e);
       setError(e.message || "Ocorreu um erro na busaca ");
+      setProducts([]); // Esvazia a lista de produtos em caso de erro
     } finally {
       setIsLoading(false);
     }
@@ -55,12 +56,13 @@ export const useProducts = () => {
         `/products/${productId}/toggle `,
         {} as ToggleProductRequest,
       );
-    } catch (e) {
+    } catch (e: any) {
       console.error("Falha ao atualizar o status do produto:", e);
-      // Se a API falhar, reverte para o estado original
-      setProducts(originalProducts);
-      // Opcional: mostrar um alerta/toast de erro para o usuário
-      alert("Não foi possível atualizar o status. Tente novamente.");
+      setError(
+        e.message ||
+          "Não foi possível atualizar o status do produto. Tente novamente.",
+      );
+      setProducts(originalProducts); // Reverte para o estado original em caso de erro
     }
   };
 
@@ -68,24 +70,25 @@ export const useProducts = () => {
     productData: CreateProductRequest,
   ): Promise<void> => {
     try {
-      const response = await api.post<SucessResponse<Product>>(
+      const response = await api.post<ApiResult<Product>>(
         "/products",
         productData,
       );
 
-      if (response.data.success && response.data.data) {
+      if (response.data.success) {
         setProducts((currentProducts) => [
-          response.data.data!,
+          response.data.data! || ({} as Product),
           ...currentProducts,
         ]);
       } else {
-        throw new Error(
-          (response.data as any).error || "Falha ao criar o produto.",
+        setError(
+          (response.data as ErrorResponse).error || "Falha ao criar o produto.",
         );
       }
-    } catch (error) {
-      console.error("ERRO AO CRIAR PRODUTO:", error);
-      throw error;
+    } catch (e: any) {
+      console.error("ERRO AO CRIAR PRODUTO:", e);
+      setError(e.message || "Falha ao criar o produto.");
+      // Não alteramos a lista de produtos, o componente chamador pode decidir como lidar com o erro.
     }
   };
 
@@ -94,26 +97,27 @@ export const useProducts = () => {
     productData: UpdateProductRequest,
   ) => {
     try {
-      const response = await api.put<SucessResponse<Product>>(
+      const response = await api.put<ApiResult<Product>>(
         `/products/${productId}`,
         productData,
       );
 
-      if (response.data.success && response.data.data) {
-        // Atualiza o produto na lista local
+      if (response.data.success) {
         setProducts((currentProducts) =>
           currentProducts.map((p) =>
-            p.id === productId ? response.data.data! : p,
+            p.id === productId ? response.data.data! || ({} as Product) : p,
           ),
         );
       } else {
-        throw new Error(
-          (response.data as any).error || "Falha ao atualizar o produto.",
+        setError(
+          (response.data as ErrorResponse).error ||
+            "Falha ao atualizar o produto.",
         );
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Erro ao atualizar produto:", e);
-      throw e;
+      setError(e.message || "Falha ao atualizar o produto.");
+      // Não revertemos a lista de produtos, o componente chamador pode decidir como lidar com o erro.
     }
   };
 
