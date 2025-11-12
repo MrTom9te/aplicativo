@@ -61,6 +61,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const bootstrapAsync = async (): Promise<void> => {
       try {
         const token = await SecureStore.getItemAsync("token");
+        console.log(
+          "Token lido do SecureStore na inicialização:",
+          token ? "Encontrado" : "Não encontrado",
+        );
         const storedUser = await AsyncStorage.getItem("user");
 
         if (token && storedUser) {
@@ -95,7 +99,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (data.success && data.data) {
           const { token: newToken, user: newUser } = data.data;
 
+          console.log("Token recebido da API de login:", newToken); // Adicionado para verificar o token
+
           await SecureStore.setItemAsync("token", newToken);
+          console.log(
+            "Token salvo no SecureStore:",
+            newToken ? "Salvo" : "Falhou",
+          );
           await AsyncStorage.setItem("user", JSON.stringify(newUser));
 
           setUser(newUser);
