@@ -1,46 +1,84 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  Button,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Order, OrderStatus } from "@/types/lib";
+
+import { useOrderDetails } from "@/hooks/useOrders";
+import type { OrderStatus } from "@/types/orders.types";
 
 const PINK = "#FF69B4";
 const LIGHT_GRAY = "#F7F7F7";
 const DARK_GRAY = "#333333";
 
-// Mock de um pedido (em um app real, você buscaria isso da API usando o ID)
-const mockOrder: Order = {
-  id: "1",
-  orderNumber: "PED-001",
-  customerName: "Carlos Pereira",
-  customerPhone: "5592999887766",
-  productId: "1",
-  productName: "Bolo de Chocolate",
-  quantity: 1,
-  unitPrice: 45.0,
-  totalPrice: 45.0,
-  deliveryDate: "2025-10-16",
-  deliveryTime: "14:00",
-  status: "pendente",
-  observations: "Sem corante artificial, por favor.",
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
+// Lista de status que o usuário pode selecionar
+const possibleStatus: OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "production",
+  "ready",
+  "delivered",
+  "cancelled",
+];
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const order = mockOrder; // Usando o mock por enquanto
 
+  // Usando o hook para buscar os dados
+  const { order, isLoading, error, refetch, updateOrderStatus } =
+    useOrderDetails(id);
+
+  // Estado local para guardar o status selecionado no picker
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | null>(
+    order?.status || null,
+  );
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Sincroniza o `selectedStatus` com o status do pedido quando ele é carregado
+  useEffect(() => {
+    if (order) {
+      setSelectedStatus(order.status);
+    }
+  }, [order]);
+
+  const handleUpdateStatus = async () => {
+    if (!selectedStatus) return;
+    setIsUpdating(true);
+    await updateOrderStatus(selectedStatus);
+    setIsUpdating(false);
+  };
+
+  // Tela de Loading
+  if (isLoading && !order) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={PINK} />
+      </View>
+    );
+  }
+
+  // Tela de Erro
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Button title="Tentar Novamente" onPress={refetch} color={PINK} />
+      </View>
+    );
+  }
+
+  // Pedido não encontrado
   if (!order) {
     return (
-      <View style={styles.container}>
+      <View style={styles.centered}>
         <Text>Pedido não encontrado.</Text>
       </View>
     );
@@ -48,6 +86,7 @@ export default function OrderDetailScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -108,7 +147,7 @@ export default function OrderDetailScreen() {
             <Text style={styles.priceLabel}>Preço Unitário</Text>
             <Text
               style={styles.priceValue}
-            >{`R$ ${order.unitPrice.toFixed(2)}`}</Text>
+            >{`R$ ${(order.unitPrice ?? 0).toFixed(2)}`}</Text>
           </View>
           <View style={[styles.priceRow, styles.totalRow]}>
             <Text style={[styles.priceLabel, styles.totalLabel]}>Total</Text>
@@ -135,13 +174,65 @@ export default function OrderDetailScreen() {
           )}
         </View>
       </View>
+
+      {/* NOVA SEÇÃO: Alterar Status */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Status do Pedido</Text>
+        <View style={styles.card}>
+          <Text style={styles.statusPickerLabel}>Selecione o novo status:</Text>
+          <View style={styles.statusOptionsContainer}>
+            {possibleStatus.map((status) => (
+              <TouchableOpacity
+                key={status}
+                style={[
+                  styles.statusOption,
+                  selectedStatus === status && styles.statusOptionSelected,
+                ]}
+                onPress={() => setSelectedStatus(status)}
+              >
+                <Text
+                  style={[
+                    styles.statusOptionText,
+                    selectedStatus === status &&
+                      styles.statusOptionTextSelected,
+                  ]}
+                >
+                  {status}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.updateButton,
+              (!selectedStatus || isUpdating) && styles.updateButtonDisabled,
+            ]}
+            onPress={handleUpdateStatus}
+            disabled={!selectedStatus || isUpdating}
+          >
+            {isUpdating ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.updateButtonText}>Atualizar Status</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Rodapé com data do pedido */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          Pedido feito em{" "}
+          {new Date(order.createdAt).toLocaleDateString("pt-BR")}
+        </Text>
+      </View>
     </ScrollView>
   );
 }
 
 const getStatusColor = (status: OrderStatus) => {
   const colors: Record<OrderStatus, string> = {
-    pendente: "#F59E0B",
+    pending: "#F59E0B",
     confirmed: "#3B82F6",
     production: "#8B5CF6",
     ready: "#10B981",
@@ -152,9 +243,22 @@ const getStatusColor = (status: OrderStatus) => {
 };
 
 const styles = StyleSheet.create({
+  // ... (estilos existentes)
   container: {
     flex: 1,
     backgroundColor: LIGHT_GRAY,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#D32F2F",
+    textAlign: "center",
+    marginBottom: 20,
   },
   header: {
     flexDirection: "row",
@@ -291,5 +395,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     fontStyle: "italic",
+  },
+  // Novos estilos para a seção de status
+  statusPickerLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 12,
+  },
+  statusOptionsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 20,
+  },
+  statusOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#eee",
+  },
+  statusOptionSelected: {
+    backgroundColor: PINK,
+  },
+  statusOptionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#555",
+    textTransform: "capitalize",
+  },
+  statusOptionTextSelected: {
+    color: "white",
+  },
+  updateButton: {
+    backgroundColor: PINK,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  updateButtonDisabled: {
+    backgroundColor: "#fcc2e2",
+  },
+  updateButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  footer: {
+    padding: 20,
+    alignItems: "center",
+  },
+  footerText: {
+    fontSize: 12,
+    color: "#999",
   },
 });
