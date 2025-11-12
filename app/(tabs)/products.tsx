@@ -38,35 +38,50 @@ export default function ProductsScreen() {
       .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [products, filter, searchQuery]);
 
-  const renderProduct = ({ item }: { item: Product }) => (
-    <View style={styles.productCard}>
-      <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
-      <View style={styles.productInfo}>
-        <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productPrice}>{`R$ ${item.price.toFixed(2)}`}</Text>
+  const renderProduct = ({ item }: { item: Product }) => {
+    const getImageUrl = (imageName: string | undefined) => {
+      if (!imageName) {
+        return "https://via.placeholder.com/60"; // Imagem de placeholder se não houver nome
+      }
+      // Assumindo que imageName é apenas o nome do arquivo (ex: "bolo_chocolate.jpg")
+      // e que seu servidor estático serve imagens de /static/images/
+      return `/static/images/${item.id}`;
+    };
+
+    return (
+      <View style={styles.productCard}>
+        <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
+        <View style={styles.productInfo}>
+          <Text style={styles.productName}>{item.name}</Text>
+          <Text
+            style={styles.productPrice}
+          >{`R$ ${item.price.toFixed(2)}`}</Text>
+        </View>
+        <View style={styles.productActions}>
+          <Switch
+            value={item.isActive}
+            onValueChange={(newStatus) =>
+              toggleProductStatus(item.id, newStatus)
+            }
+            trackColor={{ false: "#ccc", true: "#fcd4e7" }}
+            thumbColor={item.isActive ? PINK : "#f4f3f4"}
+          />
+          <Link
+            href={{ pathname: "/products/[id]", params: { id: item.id } }}
+            asChild
+          >
+            <TouchableOpacity style={styles.iconButton}>
+              <MaterialCommunityIcons
+                name="pencil-outline"
+                size={22}
+                color="#555"
+              />
+            </TouchableOpacity>
+          </Link>
+        </View>
       </View>
-      <View style={styles.productActions}>
-        <Switch
-          value={item.isActive}
-          onValueChange={(newStatus) => toggleProductStatus(item.id, newStatus)}
-          trackColor={{ false: "#ccc", true: "#fcd4e7" }}
-          thumbColor={item.isActive ? PINK : "#f4f3f4"}
-        />
-        <Link
-          href={{ pathname: "/products/[id]", params: { id: item.id } }}
-          asChild
-        >
-          <TouchableOpacity style={styles.iconButton}>
-            <MaterialCommunityIcons
-              name="pencil-outline"
-              size={22}
-              color="#555"
-            />
-          </TouchableOpacity>
-        </Link>
-      </View>
-    </View>
-  );
+    );
+  };
 
   if (isLoading && !products.length) {
     return (
