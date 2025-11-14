@@ -1,4 +1,4 @@
-# Doce Ponto - Especificação de Telas do App Mobile
+# ConfeitApp - Especificação de Telas do App Mobile
 
 ## 1. Tela de Login (`app/(auth)/login.tsx`)
 

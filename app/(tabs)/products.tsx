@@ -61,7 +61,7 @@ export default function ProductsScreen() {
           <Switch
             value={item.isActive}
             onValueChange={(newStatus) =>
-              toggleProductStatus(item.id, newStatus)
+            {console.log("call ToggleProductStatus");  toggleProductStatus(item.id, newStatus);}
             }
             trackColor={{ false: "#ccc", true: "#fcd4e7" }}
             thumbColor={item.isActive ? PINK : "#f4f3f4"}

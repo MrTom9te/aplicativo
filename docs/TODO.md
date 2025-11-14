@@ -43,3 +43,52 @@ Para suportar múltiplas lojas, a abordagem recomendada é a seguinte:
   - A criação de um pedido em `.../loja/:slug/orders` deve automaticamente associar o pedido ao `userId` correto.
 
 Esta abordagem garante que os dados de cada confeiteira (produtos, pedidos) permaneçam isolados na vitrine pública, permitindo que a plataforma cresça para atender múltiplos vendedores.
+
+---
+
+# TODO: Evolução para Aplicativo Unificado (Cliente e Confeiteira)
+
+Este documento descreve a proposta para criar um único aplicativo móvel que atenda tanto aos **clientes** quanto às **confeiteiras**, adaptando sua interface e funcionalidades com base no papel do usuário logado (Role-Based Access Control).
+
+## 1. Alterações na API (Backend)
+
+### 1.1. Modelo de Usuário Unificado
+- **Ação:** Unificar os modelos `User` e `Client` em um único modelo `User` no `prisma/schema.prisma`.
+- **Detalhes:**
+  - Adicionar um campo `role` do tipo `UserRole` (um enum com os valores `CLIENT` e `BAKER`).
+  - O `role` definirá as permissões do usuário em todo o sistema.
+  - O modelo `Order` deve ser atualizado para ter um `clientId` e um `bakerId`, ambos ligados ao modelo `User`.
+
+### 1.2. Autenticação e Autorização
+- **Ação:** Adaptar o sistema de autenticação e criar middlewares de autorização.
+- **Detalhes:**
+  - O endpoint de login (`POST /api/auth/login`) deve retornar o `role` do usuário no payload da resposta.
+  - Criar um middleware de autorização que verifique o `role` do usuário (extraído do token JWT) antes de permitir o acesso a rotas protegidas.
+  - Exemplo: A rota para criar um produto (`POST /api/products`) deve exigir o `role: "BAKER"`. A rota para ver o histórico de pedidos (`GET /api/client/orders`) deve exigir o `role: "CLIENT"`.
+
+## 2. Estrutura do Aplicativo Móvel (Frontend)
+
+### 2.1. Navegação Baseada em Papel
+- **Ação:** Criar uma estrutura de navegação que renderize diferentes conjuntos de telas com base no `role` do usuário.
+- **Detalhes:**
+  - Um `RootNavigator` verificará o `role` do usuário após o login.
+  - Se `role === 'BAKER'`, renderiza o `BakerNavigator` (com as telas de gestão).
+  - Se `role === 'CLIENT'`, renderiza o `ClientNavigator` (com as telas de compra).
+  - A estrutura de pastas deve refletir essa separação (ex: `src/screens/baker` e `src/screens/client`).
+
+## 3. Funcionalidades para o App do Cliente
+
+### 3.1. Funcionalidades Essenciais (MVP)
+- **Autenticação de Cliente:** Telas de login e registro para clientes.
+- **Perfil de Usuário:** Permitir que o cliente salve e edite seus dados (nome, telefone).
+- **Gestão de Endereços:** Salvar um ou mais endereços de entrega.
+- **Carrinho de Compras:** Adicionar múltiplos produtos ao carrinho antes de finalizar o pedido.
+- **Histórico de Pedidos:** Listar todos os pedidos feitos pelo cliente.
+
+### 3.2. Funcionalidades Avançadas ("Bacaninhas")
+- **Notificações Push:** Enviar atualizações sobre o status do pedido ("Seu pedido foi confirmado!", "Saiu para entrega!") e notificações de marketing.
+- **Refazer Pedido:** Botão para adicionar rapidamente os itens de um pedido antigo ao carrinho.
+- **Lista de Favoritos:** Permitir que clientes "favorite" produtos para fácil acesso.
+- **Programa de Fidelidade:** Sistema de pontos ou recompensas por compras recorrentes.
+- **Pagamentos Salvos:** Integrar com um gateway de pagamento para salvar os dados do cliente de forma segura (tokenização) e agilizar o checkout.
+

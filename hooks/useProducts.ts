@@ -18,13 +18,13 @@ export const useProducts = () => {
       setIsLoading(true);
       setError(null);
 
-      const response = await api.get<ApiResult<Product[]>>("/products");
+      const {data} = await api.get<ApiResult<Product[]>>("/products");
 
-      if (response.data.success) {
-        setProducts(response.data.data || []);
+      if (data.success) {
+        setProducts(data.data || []);
       } else {
         setError(
-          (response.data as ErrorResponse).error ||
+          (data as ErrorResponse).error ||
             "Não foi possível carregar os produtos.",
         );
         setProducts([]); // Esvazia a lista de produtos em caso de erro
@@ -43,6 +43,7 @@ export const useProducts = () => {
   }, [fetchProducts]);
 
   const toggleProductStatus = async (productId: string, newStatus: boolean) => {
+    console.log("[toggle] called", { productId, newStatus });
     const originalProducts = [...products];
 
     setProducts((currentProducts) =>
@@ -52,11 +53,27 @@ export const useProducts = () => {
     );
 
     try {
-      await api.patch(
-        `/products/${productId}/toggle `,
-        {} as ToggleProductRequest,
+      console.log("[toggle] calling api.patch", `/products/${productId}/toggle`);
+     const {data} = await api.patch(
+        `/products/${productId}/toggle`,
+        {isActive: newStatus},
       );
+      console.log("[toggle] api.patch done");
+      if (data.success) {
+        setProducts((currentProducts) =>
+          currentProducts.map((p) =>
+            p.id === productId ? { ...p, isActive: newStatus } : p,
+          ),
+        );
+      } else {
+        setError(
+          (data as ErrorResponse).error ||
+            "Não foi possível atualizar o status do produto.",
+        );
+        setProducts(originalProducts); // Reverte para o estado original em caso de erro
+      }
     } catch (e: any) {
+      console.log("[toggle] api.patch error", e);
       console.error("Falha ao atualizar o status do produto:", e);
       setError(
         e.message ||
@@ -70,19 +87,20 @@ export const useProducts = () => {
     productData: CreateProductRequest,
   ): Promise<void> => {
     try {
-      const response = await api.post<ApiResult<Product>>(
+       console.log("[create] calling api.post");
+      const {data} = await api.post<ApiResult<Product>>(
         "/products",
         productData,
       );
-
-      if (response.data.success) {
+      console.log("[create] api.post done");
+      if (data.success) {
         setProducts((currentProducts) => [
-          response.data.data! || ({} as Product),
+        data.data! || ({} as Product),
           ...currentProducts,
         ]);
       } else {
         setError(
-          (response.data as ErrorResponse).error || "Falha ao criar o produto.",
+          (data as ErrorResponse).error || "Falha ao criar o produto.",
         );
       }
     } catch (e: any) {
@@ -97,27 +115,33 @@ export const useProducts = () => {
     productData: UpdateProductRequest,
   ) => {
     try {
-      const response = await api.put<ApiResult<Product>>(
+      const {data} = await api.put<ApiResult<Product>>(
         `/products/${productId}`,
         productData,
       );
 
-      if (response.data.success) {
+      console.log("Produto atualizado com sucesso:", JSON.stringify(data));
+      
+      if (data.success) {
         setProducts((currentProducts) =>
           currentProducts.map((p) =>
-            p.id === productId ? response.data.data! || ({} as Product) : p,
+            p.id === productId ? data.data! || ({} as Product) : p,
           ),
         );
+        console.log("Produto atualizado com sucesso:", JSON.stringify(data.data));
       } else {
+
+        console.error("Falha ao atualizar o produto:", JSON.stringify(data));
         setError(
-          (response.data as ErrorResponse).error ||
+          (data as ErrorResponse).error ||
             "Falha ao atualizar o produto.",
         );
       }
+      
     } catch (e: any) {
       console.error("Erro ao atualizar produto:", e);
       setError(e.message || "Falha ao atualizar o produto.");
-      // Não revertemos a lista de produtos, o componente chamador pode decidir como lidar com o erro.
+     
     }
   };
 
